@@ -26,34 +26,44 @@ type Flags struct {
 
 // Module implements the zgrab2.Module interface.
 type Module struct {
+  *zgrab2.BaseModule
 	// TODO: Add any module-global state
+}
+
+// Create the module with metadata
+func NewModule() *Module {
+	return &Module{
+		BaseModule: zgrab2.NewBaseModule(
+			"#{MODULE_NAME}",
+			"Probe for #{MODULE_NAME}",
+			FIXME_DEFAULT_PORT,
+			reflect.TypeOf(Flags{}),
+		),
+	}
 }
 
 // Scanner implements the zgrab2.Scanner interface.
 type Scanner struct {
+  *zgrab2.BaseScanner
 	config *Flags
-	dialerGroupConfig *zgrab2.DialerGroupConfig
 	// TODO: Add scan state
 }
 
 // RegisterModule registers the zgrab2 module.
 func RegisterModule() {
-	var module Module
+  m := NewModule()
 	// FIXME: Set default port
-	_, err := zgrab2.AddCommand("#{MODULE_NAME}", "#{MODULE_NAME}", "Probe for #{MODULE_NAME}", FIXME_DEFAULT_PORT, &module)
+	_, err := zgrab2.AddCommand(m)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-// NewFlags returns a default Flags object.
-func (module *Module) NewFlags() any {
-	return new(Flags)
-}
-
 // NewScanner returns a new Scanner instance.
 func (module *Module) NewScanner() zgrab2.Scanner {
-	return new(Scanner)
+  return &Scanner{
+		BaseScanner: zgrab2.NewBaseScanner(module.Protocol()),
+  }
 }
 
 // Validate checks that the flags are valid.
@@ -82,24 +92,9 @@ func (scanner *Scanner) InitPerSender(senderID int) error {
 	return nil
 }
 
-// GetName returns the Scanner name defined in the Flags.
-func (scanner *Scanner) GetName() string {
-	return scanner.config.Name
-}
-
 // GetTrigger returns the Trigger defined in the Flags.
 func (scanner *Scanner) GetTrigger() string {
 	return scanner.config.Trigger
-}
-
-// Protocol returns the protocol identifier of the scan.
-func (scanner *Scanner) Protocol() string {
-	return "#{MODULE_NAME}"
-}
-
-// GetDialerGroupConfig gets the dialer group config that describes what dialers this module expects
-func (scanner *Scanner) GetDialerGroupConfig() *zgrab2.DialerGroupConfig {
-	return scanner.dialerGroupConfig
 }
 
 // Scan TODO: describe what is scanned

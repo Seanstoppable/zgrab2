@@ -90,6 +90,12 @@ func AddCommand(command string, shortDescription string, longDescription string,
 	return cmd, nil
 }
 
+/*
+func AddCommandByModule(module ScanModule) (*flags.Command, error) {
+	return AddCommand(module.Protocol(), module.Description(), module.Description(), module.Port(), module)
+}
+*/
+
 // ParseCommandLine parses the commands given on the command line
 // and validates the framework configuration (global options)
 // immediately after parsing

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -36,6 +37,29 @@ type Scanner interface {
 	// GetDialerGroupConfig returns a DialerGroupConfig that the framework will use to set up the dialer group using the module's
 	// desired dialer configuration.
 	GetDialerGroupConfig() *DialerGroupConfig
+}
+
+// BaseScanner provides default implementations for common scanner methods
+type BaseScanner struct {
+	protocol          string
+	DialerGroupConfig *DialerGroupConfig
+}
+
+// NewBaseScanner creates a new base scanner
+func NewBaseScanner(protocol string) *BaseScanner {
+	return &BaseScanner{protocol: protocol}
+}
+
+// Protocol returns the protocol identifier
+func (scanner *BaseScanner) Protocol() string {
+	return scanner.protocol
+}
+func (scanner *BaseScanner) GetName() string {
+	return scanner.Protocol()
+}
+
+func (scanner *BaseScanner) GetDialerGroupConfig() *DialerGroupConfig {
+	return scanner.DialerGroupConfig
 }
 
 // TransportProtocol is an enum for the transport layer protocol of a module
@@ -219,8 +243,54 @@ type ScanModule interface {
 	// the command-line. The framework will then call scanner.Init(name, flags).
 	NewScanner() Scanner
 
+	//GetName() string
+	//Port() int
+
 	// Description returns a string suitable for use as an overview of this module within usage text.
 	Description() string
+}
+
+type ModuleInfo struct {
+	Protocol    string
+	Description string
+	Port int
+	FlagsType   reflect.Type
+}
+
+// BaseModule provides default implementations for common module methods
+type BaseModule struct {
+	info ModuleInfo
+}
+
+// NewBaseModule creates a new base module with the given info
+func NewBaseModule(protocol, description string, defaultPort int, flagsType reflect.Type) *BaseModule {
+	return &BaseModule{
+		info: ModuleInfo{
+			Protocol:    protocol,
+			Description: description,
+			Port: defaultPort,
+			FlagsType:   flagsType,
+		},
+	}
+}
+
+// NewFlags creates a new instance of the flags type
+func (m *BaseModule) NewFlags() any {
+	return reflect.New(m.info.FlagsType).Interface()
+}
+
+
+// Description returns the module description
+func (m *BaseModule) Description() string {
+	return m.info.Description
+}
+
+func (m *BaseModule) Protocol() string {
+	return m.info.Protocol
+}
+
+func (m *BaseModule) Port() int {
+	return m.info.Port
 }
 
 // ScanFlags is an interface which must be implemented by all types sent to
