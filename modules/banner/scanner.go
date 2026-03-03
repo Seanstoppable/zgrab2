@@ -35,8 +35,7 @@ type Flags struct {
 	Probe       string `long:"probe" default:"\\n" description:"Probe to send to the server. Use triple slashes to escape, for example \\\\\\n is literal \\n. Mutually exclusive with --probe-file."`
 	ProbeFile   string `long:"probe-file" description:"Read probe from file as byte array (hex). Mutually exclusive with --probe."`
 	Pattern     string `long:"pattern" description:"Pattern to match, must be valid regexp."`
-	UseTLS            bool `long:"tls" description:"Sends probe with TLS connection. Loads TLS module command options."`
-	AllowTLSDowngrade bool `long:"allow-tls-downgrade" description:"If --tls is enabled and the TLS handshake fails, fall back to plaintext instead of aborting. Requires --tls."`
+	UseTLS      bool   `long:"tls" description:"Sends probe with TLS connection. Loads TLS module command options."`
 	MaxTries    int    `long:"max-tries" default:"1" description:"Number of tries for timeouts and connection errors before giving up. Includes making TLS connection if enabled."`
 	Hex         bool   `long:"hex" description:"Store banner value in hex. Mutually exclusive with --base64."`
 	Base64      bool   `long:"base64" description:"Store banner value in base64. Mutually exclusive with --hex."`
@@ -62,7 +61,6 @@ type Results struct {
 	Banner string         `json:"banner,omitempty"`
 	Length int            `json:"length,omitempty"`
 	TLSLog *zgrab2.TLSLog `json:"tls,omitempty"`
-	TLSUsed bool          `json:"tls_used,omitempty"`
 	MD5    string         `json:"md5,omitempty"`
 	SHA1   string         `json:"sha1,omitempty"`
 	SHA256 string         `json:"sha256,omitempty"`
@@ -119,10 +117,6 @@ func (f *Flags) Validate(_ []string) error {
 		log.Fatal("Cannot set both --probe and --probe-file")
 		return zgrab2.ErrInvalidArguments
 	}
-	if f.AllowTLSDowngrade && !f.UseTLS {
-		log.Fatal("--allow-tls-downgrade requires --tls")
-		return zgrab2.ErrInvalidArguments
-	}
 	return nil
 }
 
@@ -166,7 +160,6 @@ func (scanner *Scanner) Init(flags zgrab2.ScanFlags) error {
 		TransportAgnosticDialerProtocol: zgrab2.TransportTCP,
 		BaseFlags:                       &f.BaseFlags,
 		TLSEnabled:                      f.UseTLS,
-		NeedSeparateL4Dialer:            f.AllowTLSDowngrade,
 	}
 	if f.UseTLS {
 		scanner.dialerGroupConfig.TLSFlags = &f.TLSFlags
@@ -182,27 +175,16 @@ func (scanner *Scanner) Scan(ctx context.Context, dialGroup *zgrab2.DialerGroup,
 		results Results
 	)
 
-	if scanner.config.AllowTLSDowngrade {
-		var tlsUsed bool
-		conn, tlsUsed, err = dialGroup.DialTLSDowngrade(ctx, target, true)
+	for try := 0; try < scanner.config.MaxTries; try++ {
+		conn, err = dialGroup.Dial(ctx, target)
 		if err != nil {
-			return zgrab2.TryGetScanStatus(err), nil, err
+			continue // try again
 		}
-		results.TLSUsed = tlsUsed
-	} else {
-		for try := 0; try < scanner.config.MaxTries; try++ {
-			conn, err = dialGroup.Dial(ctx, target)
-			if err != nil {
-				continue
-			}
-			break
-		}
-		if err != nil {
-			return zgrab2.TryGetScanStatus(err), nil, fmt.Errorf("failed to connect to %v: %w", target.String(), err)
-		}
-		results.TLSUsed = scanner.config.UseTLS
+		break
 	}
-
+	if err != nil {
+		return zgrab2.TryGetScanStatus(err), nil, fmt.Errorf("failed to connect to %v: %w", target.String(), err)
+	}
 	defer func() {
 		// attempt to collect TLS Log
 		if tlsConn, ok := conn.(*zgrab2.TLSConnection); ok {
