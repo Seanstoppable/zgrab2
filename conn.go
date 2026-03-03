@@ -249,6 +249,13 @@ type Dialer struct {
 
 	// Blocklist of IPs we should not dial.
 	Blocklist cidranger.Ranger
+
+	// LocalIPs is the pool of local IP addresses available for binding.
+	// Used to re-select a family-matched local address at dial time.
+	LocalIPs []net.IP
+
+	// LocalPorts is the pool of local ports available for binding.
+	LocalPorts []uint16
 }
 
 // DialContext wraps the connection returned by net.Dialer.DialContext() with a TimeoutConnection.
@@ -296,6 +303,13 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (net.
 				}
 			}
 			return nil, fmt.Errorf("failed to wait for rate limiter for IP %s: %w", host, err)
+		}
+
+		// Re-select local address matching target's address family
+		if len(d.LocalIPs) > 0 {
+			if err = d.SetRandomLocalAddr(network, d.LocalIPs, d.LocalPorts, ip); err != nil {
+				return nil, err
+			}
 		}
 
 		// can proceed with dialing the IP address, not blocklisted
@@ -451,12 +465,41 @@ func NewDialer(value *Dialer) *Dialer {
 	return value.SetDefaults()
 }
 
+// filterByAddressFamily returns the subset of localIPs that match the address
+// family of targetIP. If targetIP is nil or localIPs is empty, returns the input unchanged.
+func filterByAddressFamily(localIPs []net.IP, targetIP net.IP) []net.IP {
+	if targetIP == nil || len(localIPs) == 0 {
+		return localIPs
+	}
+	targetIsIPv4 := targetIP.To4() != nil
+	filtered := make([]net.IP, 0, len(localIPs))
+	for _, ip := range localIPs {
+		if (ip.To4() != nil) == targetIsIPv4 {
+			filtered = append(filtered, ip)
+		}
+	}
+	return filtered
+}
+
 // SetRandomLocalAddr sets a random local address and port for the dialer. If either localIPs or localPorts are empty,
 // the IP or port, respectively, will be un-set and the system will choose.
-func (d *Dialer) SetRandomLocalAddr(network string, localIPs []net.IP, localPorts []uint16) error {
+// targetIP, if non-nil, is used to filter localIPs to the matching address family (IPv4/IPv6).
+// If targetIP is nil and localIPs are provided, no local IP is bound — binding is deferred to
+// DialContext where the actual target IP is known (e.g., after DNS resolution for domain targets).
+// If localIPs are provided but none match the target's address family, an error is returned.
+func (d *Dialer) SetRandomLocalAddr(network string, localIPs []net.IP, localPorts []uint16, targetIP net.IP) error {
 	var localIP net.IP
 	if len(localIPs) != 0 {
-		localIP = localIPs[rand.Intn(len(localIPs))]
+		if targetIP == nil {
+			// Target family unknown (e.g., domain not yet resolved).
+			// Skip IP binding; DialContext will re-select per resolved IP.
+		} else {
+			matched := filterByAddressFamily(localIPs, targetIP)
+			if len(matched) == 0 {
+				return fmt.Errorf("no local addresses match the address family of target %s", targetIP)
+			}
+			localIP = matched[rand.Intn(len(matched))]
+		}
 	}
 	var localPort int
 	if len(localPorts) != 0 {

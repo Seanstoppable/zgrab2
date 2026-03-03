@@ -155,7 +155,9 @@ func GetDefaultUDPDialer(flags *BaseFlags) func(ctx context.Context, t *ScanTarg
 	// create dialer once and reuse it
 	return func(ctx context.Context, t *ScanTarget, addr string) (net.Conn, error) {
 		dialer := GetTimeoutConnectionDialer(flags.ConnectTimeout, flags.TargetTimeout)
-		err := dialer.SetRandomLocalAddr("udp", config.localAddrs, config.localPorts)
+		dialer.LocalIPs = config.localAddrs
+		dialer.LocalPorts = config.localPorts
+		err := dialer.SetRandomLocalAddr("udp", config.localAddrs, config.localPorts, t.IP)
 		if err != nil {
 			return nil, fmt.Errorf("could not set random local address: %w", err)
 		}
@@ -216,7 +218,7 @@ func grabTarget(ctx context.Context, input ScanTarget, m *Monitor) *Grab {
 		}
 		// resolve the target's IP here once, so it doesn't need to be resolved in each module
 		dialer := NewDialer(nil)
-		err := dialer.SetRandomLocalAddr("udp", config.localAddrs, config.localPorts)
+		err := dialer.SetRandomLocalAddr("udp", config.localAddrs, config.localPorts, nil)
 		if err != nil {
 			return onResolutionFailure(input, m, fmt.Errorf("could not set random local address: %w", err))
 		}
