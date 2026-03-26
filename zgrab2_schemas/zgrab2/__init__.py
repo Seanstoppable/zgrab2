@@ -7,6 +7,8 @@ from . import http
 from . import ldap
 from . import managesieve
 from . import memcached
+from . import minecraft
+from . import minecraft_bedrock
 from . import modbus
 from . import mongodb
 from . import mssql

@@ -153,6 +153,24 @@ services:
     networks:
       - memcache-network-1.6.38
     hostname: "target"
+  minecraft:
+    build:
+      context: ./minecraft/container
+    container_name: "zgrab_minecraft"
+    networks:
+      - minecraft-network
+    hostname: "target"
+    depends_on:
+      - service_base
+  minecraft-bedrock:
+    build:
+      context: ./minecraft-bedrock/container
+    container_name: "zgrab_minecraft-bedrock"
+    networks:
+      - minecraft-bedrock-network
+    hostname: "target"
+    depends_on:
+      - service_base
   mongodb-3.2.20:
     image: "mongo:3.2.20"
     container_name: "zgrab_mongodb-3.2.20"
@@ -759,6 +777,16 @@ networks:
     ipam:
       config:
         - subnet: 100.64.0.188/30
+  minecraft-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 100.64.0.192/30
+  minecraft-bedrock-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 100.64.0.196/30
   ldap-network:
     driver: bridge
     ipam:

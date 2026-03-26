@@ -12,6 +12,8 @@ import (
 	"github.com/zmap/zgrab2/modules/imap"
 	"github.com/zmap/zgrab2/modules/ipp"
 	"github.com/zmap/zgrab2/modules/memcached"
+	"github.com/zmap/zgrab2/modules/minecraft"
+	"github.com/zmap/zgrab2/modules/minecraft_bedrock"
 	"github.com/zmap/zgrab2/modules/modbus"
 	"github.com/zmap/zgrab2/modules/mongodb"
 	"github.com/zmap/zgrab2/modules/mssql"
@@ -40,6 +42,8 @@ func init() {
 		"imap":      &imap.Module{},
 		"ipp":       &ipp.Module{},
 		"memcached": &memcached.Module{},
+		"minecraft":         &minecraft.Module{},
+		"minecraft-bedrock": &minecraft_bedrock.Module{},
 		"modbus":    &modbus.Module{},
 		"mongodb":   &mongodb.Module{},
 		"mssql":     &mssql.Module{},
